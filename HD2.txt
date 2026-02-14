@@ -1,0 +1,12 @@
+-- =====================================================
+-- BƯỚC CUỐI: NÂNG CẤP USER LÊN ADMIN
+-- Chạy script này SAU KHI đã đăng ký tài khoản trên app
+-- =====================================================
+
+-- Thay 'email_cua_ban@example.com' bằng email bạn dùng để đăng ký
+UPDATE profiles 
+SET role = 'admin', full_name = 'Trần Thị Kim Thoa'
+WHERE id = (
+  SELECT id FROM auth.users 
+  WHERE email = 'tranthikimthoa.c3hd@soctrang.edu.vn'
+);

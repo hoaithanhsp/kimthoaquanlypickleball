@@ -1,0 +1,347 @@
+-- =====================================================
+-- PICKLEBALL PRO - SCRIPT TẠO DATABASE TỔNG HỢP
+-- Chạy toàn bộ script này trong SQL Editor của Supabase
+-- =====================================================
+
+-- ===== 1. PROFILES TABLE =====
+CREATE TABLE IF NOT EXISTS profiles (
+  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name text NOT NULL DEFAULT '',
+  phone text DEFAULT '',
+  role text NOT NULL DEFAULT 'customer' CHECK (role IN ('admin', 'staff', 'customer')),
+  avatar_url text DEFAULT '',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own profile"
+  ON profiles FOR SELECT TO authenticated
+  USING (auth.uid() = id);
+
+CREATE POLICY "Admins can view all profiles"
+  ON profiles FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
+
+CREATE POLICY "Users can update own profile"
+  ON profiles FOR UPDATE TO authenticated
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Users can insert own profile"
+  ON profiles FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = id);
+
+-- Trigger: tự động tạo profile khi user đăng ký (luôn mặc định role = customer)
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, role)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+    'customer'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+
+-- ===== 2. COURTS TABLE =====
+CREATE TABLE IF NOT EXISTS courts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  type text NOT NULL DEFAULT 'outdoor' CHECK (type IN ('indoor', 'outdoor')),
+  surface text DEFAULT 'concrete',
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'maintenance', 'inactive')),
+  hourly_rate numeric NOT NULL DEFAULT 0,
+  peak_rate numeric NOT NULL DEFAULT 0,
+  lighting_fee numeric NOT NULL DEFAULT 0,
+  description text DEFAULT '',
+  image_url text DEFAULT '',
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE courts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can view active courts"
+  ON courts FOR SELECT TO authenticated
+  USING (true);
+
+CREATE POLICY "Admins can insert courts"
+  ON courts FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+CREATE POLICY "Admins can update courts"
+  ON courts FOR UPDATE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+CREATE POLICY "Admins can delete courts"
+  ON courts FOR DELETE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+
+-- ===== 3. CUSTOMERS TABLE =====
+CREATE TABLE IF NOT EXISTS customers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  phone text UNIQUE NOT NULL,
+  email text DEFAULT '',
+  is_vip boolean DEFAULT false,
+  notes text DEFAULT '',
+  total_bookings integer DEFAULT 0,
+  total_spent numeric DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Staff and admins can view customers"
+  ON customers FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Staff and admins can insert customers"
+  ON customers FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Staff and admins can update customers"
+  ON customers FOR UPDATE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Admins can delete customers"
+  ON customers FOR DELETE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+
+-- ===== 4. BOOKINGS TABLE =====
+CREATE TABLE IF NOT EXISTS bookings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  court_id uuid NOT NULL REFERENCES courts(id) ON DELETE CASCADE,
+  customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  booking_date date NOT NULL,
+  start_time time NOT NULL,
+  end_time time NOT NULL,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'checked_in', 'completed', 'cancelled')),
+  deposit_amount numeric DEFAULT 0,
+  deposit_paid boolean DEFAULT false,
+  total_amount numeric DEFAULT 0,
+  notes text DEFAULT '',
+  is_recurring boolean DEFAULT false,
+  recurring_pattern jsonb DEFAULT NULL,
+  created_by uuid REFERENCES auth.users(id),
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Staff and admins can view bookings"
+  ON bookings FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Staff and admins can insert bookings"
+  ON bookings FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Staff and admins can update bookings"
+  ON bookings FOR UPDATE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Admins can delete bookings"
+  ON bookings FOR DELETE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+CREATE INDEX idx_bookings_date ON bookings(booking_date);
+CREATE INDEX idx_bookings_court ON bookings(court_id);
+CREATE INDEX idx_bookings_customer ON bookings(customer_id);
+CREATE INDEX idx_bookings_status ON bookings(status);
+
+
+-- ===== 5. PRODUCTS TABLE =====
+CREATE TABLE IF NOT EXISTS products (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  category text NOT NULL DEFAULT 'drink' CHECK (category IN ('rental', 'food', 'drink', 'equipment', 'other')),
+  price numeric NOT NULL DEFAULT 0,
+  rental_price_per_hour numeric DEFAULT 0,
+  stock_quantity integer DEFAULT 0,
+  min_stock integer DEFAULT 5,
+  barcode text DEFAULT '',
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Staff and admins can view products"
+  ON products FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Admins can insert products"
+  ON products FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+CREATE POLICY "Admins can update products"
+  ON products FOR UPDATE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+CREATE POLICY "Admins can delete products"
+  ON products FOR DELETE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+
+-- ===== 6. INVOICES & INVOICE_ITEMS TABLES =====
+CREATE TABLE IF NOT EXISTS invoices (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_number text UNIQUE NOT NULL,
+  booking_id uuid REFERENCES bookings(id),
+  customer_id uuid REFERENCES customers(id),
+  subtotal numeric NOT NULL DEFAULT 0,
+  discount numeric DEFAULT 0,
+  tax numeric DEFAULT 0,
+  total numeric NOT NULL DEFAULT 0,
+  deposit_deducted numeric DEFAULT 0,
+  amount_due numeric NOT NULL DEFAULT 0,
+  payment_method text DEFAULT 'cash' CHECK (payment_method IN ('cash', 'transfer', 'card', 'momo', 'zalopay', 'vnpay')),
+  payment_status text DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'partial', 'paid')),
+  notes text DEFAULT '',
+  created_by uuid REFERENCES auth.users(id),
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS invoice_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id uuid NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  item_type text NOT NULL DEFAULT 'court' CHECK (item_type IN ('court', 'product', 'rental', 'lighting', 'service')),
+  item_name text NOT NULL,
+  quantity numeric NOT NULL DEFAULT 1,
+  unit_price numeric NOT NULL DEFAULT 0,
+  total_price numeric NOT NULL DEFAULT 0
+);
+
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoice_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Staff and admins can view invoices"
+  ON invoices FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Staff and admins can insert invoices"
+  ON invoices FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Admins can update invoices"
+  ON invoices FOR UPDATE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+CREATE POLICY "Staff and admins can view invoice items"
+  ON invoice_items FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Staff and admins can insert invoice items"
+  ON invoice_items FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Admins can update invoice items"
+  ON invoice_items FOR UPDATE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+CREATE INDEX idx_invoices_customer ON invoices(customer_id);
+CREATE INDEX idx_invoices_booking ON invoices(booking_id);
+CREATE INDEX idx_invoices_date ON invoices(created_at);
+CREATE INDEX idx_invoice_items_invoice ON invoice_items(invoice_id);
+
+
+-- ===== 7. SETTINGS TABLE =====
+CREATE TABLE IF NOT EXISTS settings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  key text UNIQUE NOT NULL,
+  value jsonb NOT NULL DEFAULT '{}',
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Staff and admins can view settings"
+  ON settings FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'staff')));
+
+CREATE POLICY "Admins can insert settings"
+  ON settings FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+CREATE POLICY "Admins can update settings"
+  ON settings FOR UPDATE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin')));
+
+INSERT INTO settings (key, value) VALUES
+  ('business_name', '"PickleBall Pro"'),
+  ('business_phone', '""'),
+  ('business_address', '""'),
+  ('business_email', '""'),
+  ('operating_hours', '{"open": "06:00", "close": "22:00"}'),
+  ('peak_hours', '{"start": "17:00", "end": "21:00"}'),
+  ('booking_slot_duration', '60'),
+  ('deposit_percentage', '30'),
+  ('cancellation_policy', '{"free_cancel_hours": 24, "cancel_fee_percent": 50}'),
+  ('tax_rate', '10'),
+  ('currency', '"VND"')
+ON CONFLICT (key) DO NOTHING;
+
+
+-- ===== 8. CUSTOMER BOOKING POLICIES =====
+CREATE POLICY "Customers can view own bookings"
+  ON bookings FOR SELECT TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'customer')
+    AND created_by = auth.uid()
+  );
+
+CREATE POLICY "Customers can insert own bookings"
+  ON bookings FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'customer')
+    AND created_by = auth.uid()
+  );
+
+CREATE POLICY "Customers can cancel own pending bookings"
+  ON bookings FOR UPDATE TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'customer')
+    AND created_by = auth.uid()
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'customer')
+    AND created_by = auth.uid()
+  );
+
+CREATE POLICY "Customers can view own profile"
+  ON customers FOR SELECT TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'customer')
+  );
+
+
+-- =====================================================
+-- BƯỚC CUỐI: NÂNG CẤP USER LÊN ADMIN
+-- Chạy script này SAU KHI đã đăng ký tài khoản trên app
+-- =====================================================
+
+-- Thay 'email_cua_ban@example.com' bằng email bạn dùng để đăng ký
+UPDATE profiles 
+SET role = 'admin', full_name = 'Trần Thị Kim Thoa'
+WHERE id = (
+  SELECT id FROM auth.users 
+  WHERE email = 'tranthikimthoa.c3hd@soctrang.edu.vn'
+);
