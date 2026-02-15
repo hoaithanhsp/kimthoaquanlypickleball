@@ -131,32 +131,18 @@ export default function CustomerBookingPage() {
     setSubmitting(true);
 
     try {
-      let customerId: string | null = null;
-      const { data: existing } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('email', user.email)
-        .maybeSingle();
+      // Sử dụng RPC function (SECURITY DEFINER) để tìm/tạo customer
+      // Bypass RLS vì customer không có quyền INSERT trực tiếp vào bảng customers
+      const { data: customerId, error: custErr } = await supabase.rpc('get_or_create_customer', {
+        p_name: profile?.full_name || user.email || 'Khách',
+        p_phone: profile?.phone || '',
+        p_email: user.email || '',
+      });
 
-      if (existing) {
-        customerId = existing.id;
-      } else {
-        const { data: newCust, error: custErr } = await supabase
-          .from('customers')
-          .insert({
-            name: profile?.full_name || user.email || 'Khách',
-            phone: profile?.phone || '',
-            email: user.email || '',
-          })
-          .select('id')
-          .single();
-
-        if (custErr || !newCust) {
-          alert('Không thể tạo hồ sơ khách hàng: ' + (custErr?.message || 'Lỗi không xác định'));
-          setSubmitting(false);
-          return;
-        }
-        customerId = newCust.id;
+      if (custErr || !customerId) {
+        alert('Không thể tạo hồ sơ khách hàng: ' + (custErr?.message || 'Lỗi không xác định'));
+        setSubmitting(false);
+        return;
       }
 
       const { error: bookErr } = await supabase.from('bookings').insert({
@@ -279,8 +265,8 @@ export default function CustomerBookingPage() {
                     {/* Header */}
                     <div className={`px-5 py-3 flex items-center gap-3 ${isActive ? 'bg-gradient-to-r from-emerald-50/50 to-teal-50/50' : 'bg-gray-50'}`}>
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive
-                          ? court.type === 'indoor' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'
-                          : 'bg-gray-100 text-gray-400'
+                        ? court.type === 'indoor' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'
+                        : 'bg-gray-100 text-gray-400'
                         }`}>
                         <Columns3 className="w-5 h-5" />
                       </div>
