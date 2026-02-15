@@ -8,6 +8,11 @@ export interface Profile {
   updated_at: string;
 }
 
+export interface UserProfile extends Profile {
+  email: string;
+}
+
+
 export interface Court {
   id: string;
   name: string;

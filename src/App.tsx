@@ -12,6 +12,7 @@ import POSPage from './pages/POSPage';
 import InvoicesPage from './pages/InvoicesPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
+import UsersPage from './pages/UsersPage';
 
 function App() {
   const { user, loading, setUser, setLoading, fetchProfile } = useAuthStore();
@@ -63,6 +64,7 @@ function App() {
           <Route path="/pos" element={<POSPage />} />
           <Route path="/invoices" element={<InvoicesPage />} />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/users" element={<UsersPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

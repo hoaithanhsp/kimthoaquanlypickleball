@@ -13,6 +13,7 @@ import {
   X,
   CircleDot,
   Columns3,
+  UserCog,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
@@ -24,8 +25,10 @@ const navItems = [
   { to: '/pos', icon: ShoppingCart, label: 'Bán hàng' },
   { to: '/invoices', icon: FileText, label: 'Hóa đơn' },
   { to: '/reports', icon: BarChart3, label: 'Báo cáo' },
+  { to: '/users', icon: UserCog, label: 'Người dùng' },
   { to: '/settings', icon: Settings, label: 'Cài đặt' },
 ];
+
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
