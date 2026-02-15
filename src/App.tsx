@@ -59,6 +59,9 @@ function App() {
   if (!isStaff) {
     return (
       <BrowserRouter>
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: '#fee2e2', padding: '8px 16px', fontSize: '12px', fontFamily: 'monospace' }}>
+          <strong>DEBUG:</strong> profile={JSON.stringify(profile)} | role={profile?.role || 'NULL'} | isStaff={String(isStaff)}
+        </div>
         <Routes>
           <Route element={<CustomerLayout />}>
             <Route path="/" element={<CustomerBookingPage />} />
