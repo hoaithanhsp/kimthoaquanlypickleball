@@ -22,11 +22,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   setProfile: (profile) => set({ profile }),
   setLoading: (loading) => set({ loading }),
   fetchProfile: async (userId: string) => {
-    const { data } = await supabase
+    console.log('[DEBUG] fetchProfile called with userId:', userId);
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
+    console.log('[DEBUG] fetchProfile result:', { data, error });
     set({ profile: data });
   },
   signOut: async () => {
