@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { supabase } from './lib/supabase';
 import Layout from './components/Layout';
+import CustomerLayout from './components/CustomerLayout';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import BookingsPage from './pages/BookingsPage';
@@ -13,9 +14,10 @@ import InvoicesPage from './pages/InvoicesPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import UsersPage from './pages/UsersPage';
+import CustomerBookingPage from './pages/CustomerBookingPage';
 
 function App() {
-  const { user, loading, setUser, setLoading, fetchProfile } = useAuthStore();
+  const { user, profile, loading, setUser, setLoading, fetchProfile } = useAuthStore();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -53,6 +55,22 @@ function App() {
     return <AuthPage />;
   }
 
+  // Phân quyền: admin/staff → trang quản trị, customer → trang khách
+  const isStaff = profile?.role === 'admin' || profile?.role === 'staff';
+
+  if (!isStaff) {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route element={<CustomerLayout />}>
+            <Route path="/" element={<CustomerBookingPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
@@ -74,3 +92,4 @@ function App() {
 }
 
 export default App;
+
