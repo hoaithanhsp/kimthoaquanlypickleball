@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Save, Building2, Clock, DollarSign, Shield } from 'lucide-react';
+import { Save, Building2, Clock, DollarSign, Shield, UserCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface SettingsMap {
@@ -181,6 +181,39 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phí hủy muộn (%)</label>
               <input type="number" value={settings.cancellation_policy.cancel_fee_percent} onChange={(e) => setSettings({ ...settings, cancellation_policy: { ...settings.cancellation_policy, cancel_fee_percent: +e.target.value } })} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white/50 shadow-sm">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <UserCircle className="w-5 h-5 text-purple-500" />
+          <h3 className="font-bold text-gray-900">Thông tin tác giả</h3>
+        </div>
+        <div className="p-6">
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <div className="flex items-center gap-4">
+              <img
+                src="/avatar.jpg"
+                alt="Avatar tác giả"
+                className="w-24 h-24 rounded-2xl object-cover border-2 border-emerald-200 shadow-lg shadow-emerald-100"
+                onError={(e) => { (e.target as HTMLImageElement).src = ''; (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+              <img
+                src="/logo.jpg"
+                alt="Logo trường"
+                className="w-24 h-24 rounded-2xl object-contain border-2 border-gray-200 shadow-lg bg-white p-1"
+                onError={(e) => { (e.target as HTMLImageElement).src = ''; (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+            <div className="text-center sm:text-left space-y-2">
+              <h4 className="text-xl font-bold text-gray-900">Trần Thị Kim Thoa</h4>
+              <div className="space-y-1">
+                <p className="text-sm text-emerald-600 font-semibold">Giáo viên</p>
+                <p className="text-sm text-gray-600">Trường THPT Hoàng Diệu</p>
+                <p className="text-sm text-gray-500">Số 1 Mạc Đĩnh Chi, phường Phú Lợi, thành phố Cần Thơ</p>
+              </div>
             </div>
           </div>
         </div>
