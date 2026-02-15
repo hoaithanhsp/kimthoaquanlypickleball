@@ -25,6 +25,7 @@ import type { Booking, Court, Customer } from '../types';
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [courts, setCourts] = useState<Court[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,8 +224,9 @@ export default function BookingsPage() {
                             slotBookings.map((b) => (
                               <div
                                 key={b.id}
-                                className={`text-[10px] px-2 py-1.5 rounded-lg font-medium ${getStatusColor(b.status)} cursor-pointer`}
-                                title={`${b.customer?.name || ''} | ${formatTime(b.start_time)}-${formatTime(b.end_time)}`}
+                                className={`text-[10px] px-2 py-1.5 rounded-lg font-medium ${getStatusColor(b.status)} cursor-pointer hover:ring-2 hover:ring-emerald-300 transition-all`}
+                                title={`${b.customer?.name || ''} | ${formatTime(b.start_time)}-${formatTime(b.end_time)} | Click để xem chi tiết`}
+                                onClick={() => setSelectedBooking(b)}
                               >
                                 {b.customer?.name?.split(' ').pop() || 'KH'}
                               </div>
@@ -285,6 +287,56 @@ export default function BookingsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Popup chi tiết booking khi click trên bảng */}
+      {selectedBooking && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedBooking(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Chi tiết Booking</h3>
+              <button onClick={() => setSelectedBooking(null)} className="p-1 hover:bg-gray-100 rounded-lg">
+                <XCircle className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="p-6 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${getStatusColor(selectedBooking.status)}`}>{getStatusLabel(selectedBooking.status)}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-gray-500">Sân:</span> <span className="font-semibold">{selectedBooking.court?.name}</span></div>
+                <div><span className="text-gray-500">Khách:</span> <span className="font-semibold">{selectedBooking.customer?.name || 'N/A'}</span></div>
+                <div><span className="text-gray-500">Ngày:</span> <span className="font-semibold">{selectedBooking.booking_date}</span></div>
+                <div><span className="text-gray-500">Giờ:</span> <span className="font-semibold">{formatTime(selectedBooking.start_time)} - {formatTime(selectedBooking.end_time)}</span></div>
+              </div>
+              {selectedBooking.notes && (
+                <div className="text-sm"><span className="text-gray-500">Ghi chú:</span> {selectedBooking.notes}</div>
+              )}
+              <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+                {selectedBooking.status === 'pending' && (
+                  <button onClick={() => { updateStatus(selectedBooking.id, 'confirmed'); setSelectedBooking(null); }} className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-md">
+                    <CheckCircle2 className="w-4 h-4" /> Xác nhận
+                  </button>
+                )}
+                {selectedBooking.status === 'confirmed' && (
+                  <button onClick={() => { updateStatus(selectedBooking.id, 'checked_in'); setSelectedBooking(null); }} className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 transition-colors shadow-md">
+                    <LogIn className="w-4 h-4" /> Check-in
+                  </button>
+                )}
+                {selectedBooking.status === 'checked_in' && (
+                  <button onClick={() => { updateStatus(selectedBooking.id, 'completed'); setSelectedBooking(null); }} className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-gray-600 rounded-xl hover:bg-gray-700 transition-colors shadow-md">
+                    <CheckCheck className="w-4 h-4" /> Hoàn thành
+                  </button>
+                )}
+                {selectedBooking.status !== 'cancelled' && selectedBooking.status !== 'completed' && (
+                  <button onClick={() => { updateStatus(selectedBooking.id, 'cancelled'); setSelectedBooking(null); }} className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-colors border border-red-200">
+                    <XCircle className="w-4 h-4" /> Hủy
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
