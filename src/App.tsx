@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { supabase } from './lib/supabase';
 import Layout from './components/Layout';
-import CustomerLayout from './components/CustomerLayout';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import BookingsPage from './pages/BookingsPage';
@@ -13,10 +12,9 @@ import POSPage from './pages/POSPage';
 import InvoicesPage from './pages/InvoicesPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
-import CustomerBookingPage from './pages/CustomerBookingPage';
 
 function App() {
-  const { user, profile, loading, setUser, setLoading, fetchProfile } = useAuthStore();
+  const { user, loading, setUser, setLoading, fetchProfile } = useAuthStore();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -52,24 +50,6 @@ function App() {
 
   if (!user) {
     return <AuthPage />;
-  }
-
-  const isStaff = profile?.role === 'admin' || profile?.role === 'staff';
-
-  if (!isStaff) {
-    return (
-      <BrowserRouter>
-        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: '#fee2e2', padding: '8px 16px', fontSize: '12px', fontFamily: 'monospace' }}>
-          <strong>DEBUG:</strong> profile={JSON.stringify(profile)} | role={profile?.role || 'NULL'} | isStaff={String(isStaff)}
-        </div>
-        <Routes>
-          <Route element={<CustomerLayout />}>
-            <Route path="/" element={<CustomerBookingPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    );
   }
 
   return (
