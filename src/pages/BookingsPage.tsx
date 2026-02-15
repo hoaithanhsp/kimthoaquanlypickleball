@@ -94,6 +94,45 @@ export default function BookingsPage() {
 
   async function updateStatus(id: string, status: string) {
     await supabase.from('bookings').update({ status }).eq('id', id);
+
+    // Tạo notification cho khách hàng
+    const booking = bookings.find((b) => b.id === id);
+    if (booking?.created_by) {
+      const statusMessages: Record<string, { title: string; message: string; type: string }> = {
+        confirmed: {
+          title: '✅ Booking đã xác nhận',
+          message: `Sân ${booking.court?.name || ''} ngày ${booking.booking_date} lúc ${booking.start_time}-${booking.end_time} đã được xác nhận.`,
+          type: 'booking_confirmed',
+        },
+        cancelled: {
+          title: '❌ Booking đã bị hủy',
+          message: `Sân ${booking.court?.name || ''} ngày ${booking.booking_date} lúc ${booking.start_time}-${booking.end_time} đã bị hủy bởi admin.`,
+          type: 'booking_cancelled',
+        },
+        checked_in: {
+          title: '🏸 Đã check-in',
+          message: `Bạn đã check-in sân ${booking.court?.name || ''} lúc ${booking.start_time}. Chúc bạn chơi vui!`,
+          type: 'booking_checked_in',
+        },
+        completed: {
+          title: '🎉 Hoàn thành',
+          message: `Buổi chơi tại sân ${booking.court?.name || ''} đã hoàn thành. Cảm ơn bạn!`,
+          type: 'booking_completed',
+        },
+      };
+
+      const info = statusMessages[status];
+      if (info) {
+        await supabase.from('notifications').insert({
+          user_id: booking.created_by,
+          title: info.title,
+          message: info.message,
+          type: info.type,
+          booking_id: id,
+        });
+      }
+    }
+
     loadData();
   }
 
@@ -142,10 +181,10 @@ export default function BookingsPage() {
             key={day.toISOString()}
             onClick={() => setSelectedDay(day)}
             className={`flex-1 min-w-[80px] py-3 px-2 rounded-xl text-center transition-all ${isSameDay(day, selectedDay)
-                ? 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-200'
-                : isSameDay(day, new Date())
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                  : 'bg-white/80 text-gray-600 border border-white/50 hover:bg-white'
+              ? 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-200'
+              : isSameDay(day, new Date())
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                : 'bg-white/80 text-gray-600 border border-white/50 hover:bg-white'
               }`}
           >
             <div className="text-xs font-medium">{format(day, 'EEE', { locale: vi })}</div>

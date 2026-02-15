@@ -109,3 +109,14 @@ export interface Setting {
   value: unknown;
   updated_at: string;
 }
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: 'booking_confirmed' | 'booking_cancelled' | 'booking_checked_in' | 'booking_completed' | 'info';
+  is_read: boolean;
+  booking_id: string | null;
+  created_at: string;
+}
