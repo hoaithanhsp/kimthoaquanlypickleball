@@ -3,11 +3,14 @@ import {
   DollarSign,
   Calendar,
   Users,
-  TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
   Clock,
   CircleDot,
+  CheckCircle2,
+  XCircle,
+  LogIn,
+  CheckCheck,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { supabase } from '../lib/supabase';
@@ -72,6 +75,49 @@ export default function DashboardPage() {
     setCourtUsage(usage.length > 0 ? usage : [{ name: 'Chưa có sân', value: 0 }]);
 
     setLoading(false);
+  }
+
+  async function updateStatus(id: string, status: string) {
+    await supabase.from('bookings').update({ status }).eq('id', id);
+
+    // Tạo notification cho khách hàng
+    const booking = todayBookings.find((b) => b.id === id);
+    if (booking?.created_by) {
+      const statusMessages: Record<string, { title: string; message: string; type: string }> = {
+        confirmed: {
+          title: '✅ Booking đã xác nhận',
+          message: `Sân ${booking.court?.name || ''} ngày ${booking.booking_date} lúc ${booking.start_time}-${booking.end_time} đã được xác nhận.`,
+          type: 'booking_confirmed',
+        },
+        cancelled: {
+          title: '❌ Booking đã bị hủy',
+          message: `Sân ${booking.court?.name || ''} ngày ${booking.booking_date} lúc ${booking.start_time}-${booking.end_time} đã bị hủy bởi admin.`,
+          type: 'booking_cancelled',
+        },
+        checked_in: {
+          title: '🏸 Đã check-in',
+          message: `Bạn đã check-in sân ${booking.court?.name || ''} lúc ${booking.start_time}. Chúc bạn chơi vui!`,
+          type: 'booking_checked_in',
+        },
+        completed: {
+          title: '🎉 Hoàn thành',
+          message: `Buổi chơi tại sân ${booking.court?.name || ''} đã hoàn thành. Cảm ơn bạn!`,
+          type: 'booking_completed',
+        },
+      };
+      const info = statusMessages[status];
+      if (info) {
+        await supabase.from('notifications').insert({
+          user_id: booking.created_by,
+          title: info.title,
+          message: info.message,
+          type: info.type,
+          booking_id: id,
+        });
+      }
+    }
+
+    loadDashboard();
   }
 
   if (loading) {
@@ -195,7 +241,28 @@ export default function DashboardPage() {
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${getStatusColor(b.status)}`}>
                   {getStatusLabel(b.status)}
                 </span>
-                <TrendingUp className="w-4 h-4 text-gray-300" />
+                <div className="flex items-center gap-1">
+                  {b.status === 'pending' && (
+                    <button onClick={() => updateStatus(b.id, 'confirmed')} className="p-1.5 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" title="Xác nhận">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                  )}
+                  {b.status === 'confirmed' && (
+                    <button onClick={() => updateStatus(b.id, 'checked_in')} className="p-1.5 text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors" title="Check-in">
+                      <LogIn className="w-4 h-4" />
+                    </button>
+                  )}
+                  {b.status === 'checked_in' && (
+                    <button onClick={() => updateStatus(b.id, 'completed')} className="p-1.5 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors" title="Hoàn thành">
+                      <CheckCheck className="w-4 h-4" />
+                    </button>
+                  )}
+                  {b.status !== 'cancelled' && b.status !== 'completed' && (
+                    <button onClick={() => updateStatus(b.id, 'cancelled')} className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors" title="Hủy">
+                      <XCircle className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
