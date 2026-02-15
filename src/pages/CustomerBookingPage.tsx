@@ -89,36 +89,62 @@ export default function CustomerBookingPage() {
     if (!selectedCourt || !user) return;
     setSubmitting(true);
 
-    let customerRecord = null;
-    const { data: existing } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('email', user.email)
-      .maybeSingle();
+    try {
+      // Tìm hoặc tạo customer record
+      let customerId: string | null = null;
+      const { data: existing } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('email', user.email)
+        .maybeSingle();
 
-    if (existing) {
-      customerRecord = existing;
+      if (existing) {
+        customerId = existing.id;
+      } else {
+        // Tự tạo customer record cho user mới
+        const { data: newCust, error: custErr } = await supabase
+          .from('customers')
+          .insert({
+            name: profile?.full_name || user.email || 'Khách',
+            phone: profile?.phone || '',
+            email: user.email || '',
+          })
+          .select('id')
+          .single();
+
+        if (custErr || !newCust) {
+          alert('Không thể tạo hồ sơ khách hàng: ' + (custErr?.message || 'Lỗi không xác định'));
+          setSubmitting(false);
+          return;
+        }
+        customerId = newCust.id;
+      }
+
+      const { error: bookErr } = await supabase.from('bookings').insert({
+        court_id: selectedCourt.id,
+        customer_id: customerId,
+        booking_date: format(selectedDay, 'yyyy-MM-dd'),
+        start_time: form.start_time,
+        end_time: form.end_time,
+        notes: form.notes,
+        status: 'pending',
+        created_by: user.id,
+      });
+
+      if (bookErr) {
+        alert('Đặt sân thất bại: ' + bookErr.message);
+        setSubmitting(false);
+        return;
+      }
+
+      setShowBookingForm(false);
+      setSubmitting(false);
+      loadData();
+      setTab('my');
+    } catch (err) {
+      alert('Có lỗi xảy ra, vui lòng thử lại');
+      setSubmitting(false);
     }
-
-    const bookingData: Record<string, unknown> = {
-      court_id: selectedCourt.id,
-      booking_date: format(selectedDay, 'yyyy-MM-dd'),
-      start_time: form.start_time,
-      end_time: form.end_time,
-      notes: form.notes,
-      status: 'pending',
-      created_by: user.id,
-    };
-
-    if (customerRecord) {
-      bookingData.customer_id = customerRecord.id;
-    }
-
-    await supabase.from('bookings').insert(bookingData);
-    setShowBookingForm(false);
-    setSubmitting(false);
-    loadData();
-    setTab('my');
   }
 
   async function handleCancel(id: string) {
@@ -200,12 +226,12 @@ export default function CustomerBookingPage() {
                   onClick={() => !isPast && setSelectedDay(day)}
                   disabled={isPast}
                   className={`flex-1 min-w-[72px] py-3 px-2 rounded-xl text-center transition-all ${isPast
-                      ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
-                      : isSameDay(day, selectedDay)
-                        ? 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-200'
-                        : isSameDay(day, new Date())
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                          : 'bg-white/80 text-gray-600 border border-white/50 hover:bg-white'
+                    ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                    : isSameDay(day, selectedDay)
+                      ? 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-200'
+                      : isSameDay(day, new Date())
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                        : 'bg-white/80 text-gray-600 border border-white/50 hover:bg-white'
                     }`}
                 >
                   <div className="text-xs font-medium">{format(day, 'EEE', { locale: vi })}</div>
@@ -247,10 +273,10 @@ export default function CustomerBookingPage() {
                           onClick={() => handleSlotClick(court, time)}
                           disabled={booked || isPast}
                           className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${booked
-                              ? 'bg-red-50 text-red-300 cursor-not-allowed line-through'
-                              : isPast
-                                ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
-                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:shadow-sm cursor-pointer'
+                            ? 'bg-red-50 text-red-300 cursor-not-allowed line-through'
+                            : isPast
+                              ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:shadow-sm cursor-pointer'
                             }`}
                         >
                           {time}
