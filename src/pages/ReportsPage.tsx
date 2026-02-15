@@ -122,6 +122,51 @@ export default function ReportsPage() {
     setLoading(false);
   }
 
+  function exportCSV() {
+    const BOM = '\uFEFF';
+    const lines: string[] = [];
+
+    // Tổng quan
+    lines.push('=== BÁO CÁO TỔNG QUAN ===');
+    lines.push(`Kỳ báo cáo,${period === 'week' ? 'Tuần' : period === 'month' ? 'Tháng' : 'Năm'}`);
+    lines.push(`Tổng doanh thu,${summary.totalRevenue}`);
+    lines.push(`Tổng booking,${summary.totalBookings}`);
+    lines.push(`TB/booking,${Math.round(summary.avgPerBooking)}`);
+    lines.push(`Khách hàng mới,${summary.newCustomers}`);
+    lines.push('');
+
+    // Doanh thu theo ngày/tháng
+    lines.push('=== DOANH THU & BOOKING ===');
+    lines.push('Thời gian,Doanh thu,Booking');
+    revenueData.forEach((d) => lines.push(`${d.name},${d.revenue},${d.bookings}`));
+    lines.push('');
+
+    // Tỷ lệ sân
+    lines.push('=== TỶ LỆ SÂN ===');
+    lines.push('Sân,Lượt đặt');
+    revenueByType.forEach((d) => lines.push(`${d.name},${d.value}`));
+    lines.push('');
+
+    // Giờ cao điểm
+    lines.push('=== GIỜ CAO ĐIỂM ===');
+    lines.push('Giờ,Số lượt');
+    peakHours.forEach((d) => lines.push(`${d.hour},${d.count}`));
+    lines.push('');
+
+    // Top khách hàng
+    lines.push('=== TOP KHÁCH HÀNG ===');
+    lines.push('Tên,Tổng chi,Lượt booking');
+    topCustomers.forEach((c) => lines.push(`${c.name},${c.spent},${c.bookings}`));
+
+    const blob = new Blob([BOM + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bao-cao-${period}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -145,7 +190,7 @@ export default function ReportsPage() {
             </button>
           ))}
         </div>
-        <button className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-xl hover:bg-white/80 transition-colors">
+        <button onClick={exportCSV} className="flex items-center gap-2 text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 rounded-xl font-semibold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md shadow-emerald-200/50 btn-shine">
           <Download className="w-4 h-4" />
           Xuất báo cáo
         </button>
