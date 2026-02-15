@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { CircleDot, LogOut, User } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import NotificationBell from './NotificationBell';
 
 export default function CustomerLayout() {
   const { profile, signOut } = useAuthStore();
@@ -15,7 +16,8 @@ export default function CustomerLayout() {
             </div>
             <span className="font-bold text-gray-900 text-sm">PickleBall Pro</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <NotificationBell />
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center shadow-sm">
                 <User className="w-3.5 h-3.5 text-white" />
